@@ -5,68 +5,6 @@ import (
 	"testing"
 )
 
-func TestBasicInput1(t *testing.T) {
-	var start Node
-
-	test_string := "a aa b"
-	fmt.Printf("\n%v\n", test_string)
-
-	var inserter = start.get_inserter()
-	for b := range test_string {
-		inserter(test_string[b])
-	}
-	inserter(' ') // ensure the last word is flushed
-
-	if len(start.children) != 2 {
-		t.Errorf("start.children not 2")
-	}
-	if start.children[0].char != 'a' {
-		t.Errorf("first edge is not 'a' but '%v'", string(start.children[0].char))
-	}
-	if start.children[1].char != 'b' {
-		t.Errorf("next edge is not 'b' but '%v'", string(start.children[1].char))
-	}
-
-	//expected_dump := "{0 0 [{97 1 [{97 1 []}]} {98 1 []}]}"
-	//if dump:=fmt.Sprintf("%v", start); dump != expected_dump {
-	//    t.Errorf("struct was '%v' but should be '%v'", dump, expected_dump)
-	//}
-	fmt.Printf("\n")
-	start.dump()
-
-}
-
-func TestBasicInputRepeats(t *testing.T) {
-	var start Node
-
-	test_string := "a aa b aa b a"
-	fmt.Printf("\n%v\n", test_string)
-
-	var inserter = start.get_inserter()
-	for b := range test_string {
-		inserter(test_string[b])
-	}
-	inserter(' ') // ensure the last word is flushed
-
-	if len(start.children) != 2 {
-		t.Errorf("start.children not 2")
-	}
-	if start.children[0].char != 'a' {
-		t.Errorf("first edge is not 'a' but '%v'", string(start.children[0].char))
-	}
-	if start.children[1].char != 'b' {
-		t.Errorf("next edge is not 'b' but '%v'", string(start.children[1].char))
-	}
-
-	//expected_dump := "{0 0 [{97 1 [{97 1 []}]} {98 1 []}]}"
-	//if dump:=fmt.Sprintf("%v", start); dump != expected_dump {
-	//    t.Errorf("struct was '%v' but should be '%v'", dump, expected_dump)
-	//}
-	fmt.Printf("\n")
-	start.dump()
-
-}
-
 func test_string() string {
 	return `
 **The Project Gutenberg Etext of Moby Dick, by Herman Melville**
@@ -106,42 +44,48 @@ June, 2001  [Etext #2701]
 }
 
 func TestLongInput(t *testing.T) {
+
+	topwords := NewTopwords(10)
 	var start Node
 	test_string := test_string()
 	fmt.Printf("\n%v\n", test_string)
 
-	var inserter = start.get_inserter()
+	var inserter = topwords.get_inserter()
 	for b := range test_string {
 		inserter(test_string[b])
 	}
-	inserter(' ') // ensure the last word is flushed
 
-	if len(start.children) != 23 {
+	inserter(' ') // ensure the last word is flushed
+	if topwords.uniquewordcount != 107 {
+		t.Errorf("topwords.uniquewordcount not 107 but %v", topwords.uniquewordcount)
+	}
+
+	if len(topwords.start.children) != 23 {
 		t.Errorf("start.children not 23 but %v", len(start.children))
 	}
-	if start.children[0].char != 't' {
+	if topwords.start.children[0].char != 't' {
 		t.Errorf("first child is not 't' but '%v'", string(start.children[0].char))
 	}
-	if start.children[1].char != 'p' {
+	if topwords.start.children[1].char != 'p' {
 		t.Errorf("next edge is not 'p' but '%v'", string(start.children[1].char))
 	}
 
-	//expected_dump := "{0 0 [{97 1 [{97 1 []}]} {98 1 []}]}"
-	//if dump:=fmt.Sprintf("%v", start); dump != expected_dump {
-	//    t.Errorf("struct was '%v' but should be '%v'", dump, expected_dump)
-	//}
 	fmt.Printf("\n")
 	start.dump()
 
 }
 
 func TestSortedOut(t *testing.T) {
+    //    3
+    //  2   2
+    //2   1
 
 	fmt.Println("\n--------------------------------TestSortedOut\n")
-	test_string := "this is one word this is another word and another word"
+	//test_string := "this is one word this is another word and another word"
+	test_string := "one this this one one two two three four four"
 
 	topwords := NewTopwords(6)
-	var inserter = topwords.start.get_inserter()
+	var inserter = topwords.get_inserter()
 	for b := range test_string {
 		inserter(test_string[b])
 	}
@@ -150,23 +94,32 @@ func TestSortedOut(t *testing.T) {
 	fmt.Printf("\ndump---------------\n")
 	topwords.start.dump()
 
+	fmt.Printf("\ncalculating most frequent---------------\n")
 	topwords.most_frequent()
 
-	fmt.Printf("Topwords returned %v words\n", len(topwords.sortedwords))
+	fmt.Printf("Topwords returned %v words\n", len(topwords.wordheap))
 
-	for t := range topwords.sortedwords {
-		fmt.Printf("%v %v\n", topwords.sortedwords[t].count, topwords.sortedwords[t].word)
+	oldcount := uint(99999999999999999)
+	for wc, ok := topwords.readword(); ok != false; wc, ok = topwords.readword() {
+		fmt.Printf("%v\t%v\n", wc.count, wc.word)
+		if oldcount < wc.count {
+			fmt.Printf("ERROR: unordered item\n")
+		}
+		oldcount = wc.count
 	}
-
 }
 
-func TestSortedOutLong(t *testing.T) {
+func TestSortedOut2(t *testing.T) {
+    // heap of this shape:
+    //    3
+    //  3   2
+    //1
 
-	fmt.Println("\n--------------------------------TestSortedOutLong\n")
-	test_string := test_string()
+	fmt.Println("\n--------------------------------TestSortedOut2\n")
+	test_string := "one this this this one two three three three"
 
 	topwords := NewTopwords(6)
-	var inserter = topwords.start.get_inserter()
+	var inserter = topwords.get_inserter()
 	for b := range test_string {
 		inserter(test_string[b])
 	}
@@ -175,12 +128,85 @@ func TestSortedOutLong(t *testing.T) {
 	fmt.Printf("\ndump---------------\n")
 	topwords.start.dump()
 
+	fmt.Printf("\ncalculating most frequent---------------\n")
 	topwords.most_frequent()
 
-	fmt.Printf("Topwords returned %v words\n", len(topwords.sortedwords))
+	fmt.Printf("Topwords returned %v words\n", len(topwords.wordheap))
 
-	for t := range topwords.sortedwords {
-		fmt.Printf("%v %v\n", topwords.sortedwords[t].count, topwords.sortedwords[t].word)
+	oldcount := uint(99999999999999999)
+	for wc, ok := topwords.readword(); ok != false; wc, ok = topwords.readword() {
+		fmt.Printf("%v\t%v\n", wc.count, wc.word)
+		if oldcount < wc.count {
+			fmt.Printf("ERROR: unordered item\n")
+		}
+		oldcount = wc.count
 	}
+}
 
+func TestSortedOut3(t *testing.T) {
+	// A heap with this shape:
+	//      4
+	//  4      3
+	//3   3  1   
+
+	fmt.Println("\n--------------------------------TestSortedOut3\n")
+	test_string := "one this this this one two three three three four five five five five four four one t t  t  t"
+
+	topwords := NewTopwords(8)
+	var inserter = topwords.get_inserter()
+	for b := range test_string {
+		inserter(test_string[b])
+	}
+	inserter(' ') // ensure the last word is flushed
+
+	fmt.Printf("\ndump---------------\n")
+	topwords.start.dump()
+
+	fmt.Printf("\ncalculating most frequent---------------\n")
+	topwords.most_frequent()
+
+	fmt.Printf("Topwords returned %v words\n", len(topwords.wordheap))
+
+	oldcount := uint(99999999999999999)
+	for wc, ok := topwords.readword(); ok != false; wc, ok = topwords.readword() {
+		fmt.Printf("%v\t%v\n", wc.count, wc.word)
+		if oldcount < wc.count {
+			fmt.Printf("ERROR: unordered item\n")
+		}
+		oldcount = wc.count
+	}
+}
+
+func TestSortedOut4(t *testing.T) {
+	// A heap with this shape:
+	//      4
+	//  4      3
+	//3   3  1  1 
+
+	fmt.Println("\n--------------------------------TestSortedOut4\n")
+	test_string := "one this x this this one two three three three four five five five five four four one t t  t  t"
+
+	topwords := NewTopwords(8)
+	var inserter = topwords.get_inserter()
+	for b := range test_string {
+		inserter(test_string[b])
+	}
+	inserter(' ') // ensure the last word is flushed
+
+	fmt.Printf("\ndump---------------\n")
+	topwords.start.dump()
+
+	fmt.Printf("\ncalculating most frequent---------------\n")
+	topwords.most_frequent()
+
+	fmt.Printf("Topwords returned %v words\n", len(topwords.wordheap))
+
+	oldcount := uint(99999999999999999)
+	for wc, ok := topwords.readword(); ok != false; wc, ok = topwords.readword() {
+		fmt.Printf("%v\t%v\n", wc.count, wc.word)
+		if oldcount < wc.count {
+			fmt.Printf("ERROR: unordered item\n")
+		}
+		oldcount = wc.count
+	}
 }
